@@ -470,7 +470,12 @@ class FDConv(nn.Conv2d):
                     w = dft_weight[i][indices[0, :, :], indices[1, :, :]][None] * self.alpha
                     DFT_map[:, indices[0, :, :], indices[1, :, :]] += torch.stack([w[..., 0] * kernel_attention[:, i], w[..., 1] * kernel_attention[:, i]], dim=-1)
 
-            adaptive_weights = torch.fft.irfft2(torch.view_as_complex(DFT_map), dim=(1, 2)).reshape(batch_size, 1, self.out_channels, self.kernel_size[0], self.in_channels, self.kernel_size[1])
+            # adaptive_weights = torch.fft.irfft2(torch.view_as_complex(DFT_map), dim=(1, 2)).reshape(batch_size, 1, self.out_channels, self.kernel_size[0], self.in_channels, self.kernel_size[1])
+            adaptive_weights = torch.fft.irfft2(
+                torch.view_as_complex(DFT_map),
+                s=(self.out_channels * self.kernel_size[0], self.in_channels * self.kernel_size[1]),
+                dim=(1, 2)
+            ).reshape(batch_size, 1, self.out_channels, self.kernel_size[0], self.in_channels, self.kernel_size[1])
             adaptive_weights = adaptive_weights.permute(0, 1, 2, 4, 3, 5)
             adaptive_weights = adaptive_weights.to(orig_dtype)
 
