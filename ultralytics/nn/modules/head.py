@@ -271,7 +271,7 @@ class RTDETRDecoder(nn.Module):
 
     def __init__(
         self,
-        nc=80,
+        nc=10,
         ch=(512, 1024, 2048),
         hd=256,  # hidden dim
         nq=300,  # num queries
@@ -284,7 +284,7 @@ class RTDETRDecoder(nn.Module):
         eval_idx=-1,
         # Training args
         nd=100,  # num denoising
-        label_noise_ratio=0.5,
+        label_noise_ratio=0.25,
         box_noise_scale=1.0,
         learnt_init_query=False,
     ):
