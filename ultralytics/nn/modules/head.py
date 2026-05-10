@@ -285,7 +285,7 @@ class RTDETRDecoder(nn.Module):
         # Training args
         nd=100,  # num denoising
         label_noise_ratio=0.25,
-        box_noise_scale=1.0,
+        box_noise_scale=0.5,
         learnt_init_query=False,
     ):
         """
