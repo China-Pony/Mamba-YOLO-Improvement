@@ -18,6 +18,7 @@ def parse_opt():
     parser.add_argument('--optimizer', default='SGD', help='SGD, Adam, AdamW')
     parser.add_argument('--lr0', type=float, default=0.01, help='initial learning rate')
     parser.add_argument('--lrf', type=float, default=0.01, help='final learning rate factor (lr0 * lrf)')
+    parser.add_argument('--cos_lr', action='store_true', help='open cos_lr : helpful when training in long epochs')
     parser.add_argument('--warmup_epochs', type=float, default=3.0, help='warmup epochs')
     parser.add_argument('--warmup_bias_lr', type=float, default=0.01, help='warmup bias learning rate')
     parser.add_argument('--close_mosaic', type=int, default=10, help='disable mosaic for last N epochs (0=disabled)')
@@ -40,6 +41,7 @@ if __name__ == '__main__':
         "optimizer": opt.optimizer,
         "lr0": opt.lr0,
         "lrf": opt.lrf,
+        "cos_lr": opt.cos_lr,
         "warmup_epochs": opt.warmup_epochs,
         "warmup_bias_lr": opt.warmup_bias_lr,
         "close_mosaic": opt.close_mosaic,
