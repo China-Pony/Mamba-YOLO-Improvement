@@ -13,7 +13,7 @@ def parse_opt():
     parser.add_argument('--imgsz', '--img', '--img-size', type=int, default=1280, help='inference size (pixels)')
     parser.add_argument('--task', default='train', help='train, val, test, speed or study')
     parser.add_argument('--device', default='0', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
-    parser.add_argument('--workers', type=int, default=8, help='max dataloader workers (per RANK in DDP mode)')
+    parser.add_argument('--workers', type=int, default=24, help='max dataloader workers (per RANK in DDP mode)')
     parser.add_argument('--epochs', type=int, default=300)
     parser.add_argument('--optimizer', default='SGD', help='SGD, Adam, AdamW')
     parser.add_argument('--lr0', type=float, default=0.01, help='initial learning rate')
