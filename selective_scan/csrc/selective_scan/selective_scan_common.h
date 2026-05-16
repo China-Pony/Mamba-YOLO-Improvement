@@ -4,9 +4,15 @@
 
 #pragma once
 
+#include <math.h>
+
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
 #include <c10/util/complex.h>  // For scalar_value_type
+
+#ifndef M_LOG2E
+#define M_LOG2E 1.44269504088896340736
+#endif
 
 #define MAX_DSTATE 256
 

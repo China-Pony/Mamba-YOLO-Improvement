@@ -28,9 +28,30 @@ this_dir = os.path.dirname(os.path.abspath(__file__))
 FORCE_CXX11_ABI = os.getenv("FORCE_CXX11_ABI", "FALSE") == "TRUE"
 
 def get_cuda_bare_metal_version(cuda_dir):
-    raw_output = subprocess.check_output(
-        [cuda_dir + "/bin/nvcc", "-V"], universal_newlines=True
-    )
+    candidates = []
+    nvcc_name = "nvcc.exe" if os.name == "nt" else "nvcc"
+    if cuda_dir:
+        candidates.append(os.path.join(cuda_dir, "bin", nvcc_name))
+    which_nvcc = shutil.which("nvcc")
+    if which_nvcc:
+        candidates.append(which_nvcc)
+    # 去重并按顺序尝试，增强 Windows 下路径兼容性
+    seen = set()
+    candidates = [c for c in candidates if c and not (c in seen or seen.add(c))]
+
+    last_error = None
+    raw_output = None
+    for nvcc_path in candidates:
+        try:
+            print(f"Trying nvcc at: {nvcc_path}", flush=True)
+            raw_output = subprocess.check_output([nvcc_path, "-V"], universal_newlines=True)
+            break
+        except Exception as e:
+            last_error = e
+
+    if raw_output is None:
+        raise RuntimeError(f"Unable to execute nvcc from candidates: {candidates}. Last error: {last_error}")
+
     output = raw_output.split()
     release_idx = output.index("release") + 1
     bare_metal_version = parse(output[release_idx].split(",")[0])
@@ -39,6 +60,36 @@ def get_cuda_bare_metal_version(cuda_dir):
 
 MODES = ["core", "ndstate", "oflex"]
 # MODES = ["core", "ndstate", "oflex", "nrow"]
+
+
+def get_cxx_compile_args():
+    if os.name == "nt":
+        return ["/O2", "/std:c++17"]
+    return ["-O3", "-std=c++17"]
+
+
+def get_nvcc_compile_args(cc_flag):
+    args = [
+        "-O3",
+        "-std=c++17",
+        "-U__CUDA_NO_HALF_OPERATORS__",
+        "-U__CUDA_NO_HALF_CONVERSIONS__",
+        "-U__CUDA_NO_BFLOAT16_OPERATORS__",
+        "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
+        "-U__CUDA_NO_BFLOAT162_OPERATORS__",
+        "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
+        "--expt-relaxed-constexpr",
+        "--expt-extended-lambda",
+        "--use_fast_math",
+        "--ptxas-options=-v",
+        "-lineinfo",
+    ] + cc_flag
+
+    if os.name == "nt":
+        # CUDA 12.1 对较新的 MSVC 工具链版本检查较严格，Windows 下允许继续尝试编译。
+        args.append("-allow-unsupported-compiler")
+
+    return args
 
 def get_ext():
     cc_flag = []
@@ -49,11 +100,17 @@ def get_ext():
     # Check, if CUDA11 is installed for compute capability 8.0
     multi_threads = True
     gencode_sm90 = False
+    gencode_sm100 = False  # For RTX 50 series (Blackwell)
+    gencode_sm120 = False  # For RTX 5090
     if CUDA_HOME is not None:
         _, bare_metal_version = get_cuda_bare_metal_version(CUDA_HOME)
         print("CUDA version: ", bare_metal_version, flush=True)
         if bare_metal_version >= Version("11.8"):
             gencode_sm90 = True
+        if bare_metal_version >= Version("12.0"):
+            gencode_sm100 = True
+        if bare_metal_version >= Version("12.8"):
+            gencode_sm120 = True
         if bare_metal_version < Version("11.6"):
             warnings.warn("CUDA version ealier than 11.6 may leads to performance mismatch.")
         if bare_metal_version < Version("11.2"):
@@ -63,6 +120,10 @@ def get_ext():
     cc_flag.extend(["-gencode", "arch=compute_80,code=sm_80"])
     if gencode_sm90:
         cc_flag.extend(["-gencode", "arch=compute_90,code=sm_90"])
+    if gencode_sm100:
+        cc_flag.extend(["-gencode", "arch=compute_100,code=sm_100"])
+    if gencode_sm120:
+        cc_flag.extend(["-gencode", "arch=compute_120,code=sm_120"])
     if multi_threads:
         cc_flag.extend(["--threads", "4"])
 
@@ -113,23 +174,8 @@ def get_ext():
             name=names.get(MODE, None),
             sources=sources.get(MODE, None),
             extra_compile_args={
-                "cxx": ["-O3", "-std=c++17"],
-                "nvcc": [
-                            "-O3",
-                            "-std=c++17",
-                            "-U__CUDA_NO_HALF_OPERATORS__",
-                            "-U__CUDA_NO_HALF_CONVERSIONS__",
-                            "-U__CUDA_NO_BFLOAT16_OPERATORS__",
-                            "-U__CUDA_NO_BFLOAT16_CONVERSIONS__",
-                            "-U__CUDA_NO_BFLOAT162_OPERATORS__",
-                            "-U__CUDA_NO_BFLOAT162_CONVERSIONS__",
-                            "--expt-relaxed-constexpr",
-                            "--expt-extended-lambda",
-                            "--use_fast_math",
-                            "--ptxas-options=-v",
-                            "-lineinfo",
-                        ]
-                        + cc_flag
+                "cxx": get_cxx_compile_args(),
+                "nvcc": get_nvcc_compile_args(cc_flag)
             },
             include_dirs=[Path(this_dir) / "csrc" / "selective_scan"],
         )
@@ -155,7 +201,7 @@ setup(
         "Operating System :: Unix",
     ],
     ext_modules=ext_modules,
-    cmdclass={"bdist_wheel": _bdist_wheel, "build_ext": BuildExtension} if ext_modules else {"bdist_wheel": _bdist_wheel,},
+    cmdclass={"bdist_wheel": _bdist_wheel, "build_ext": BuildExtension.with_options(use_ninja=False)} if ext_modules else {"bdist_wheel": _bdist_wheel,},
     python_requires=">=3.7",
     install_requires=[
         "torch",

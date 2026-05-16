@@ -181,10 +181,11 @@ void selective_scan_fwd_kernel(SSMParamsBase params) {
 
 template<int kNThreads, int kNItems, typename input_t, typename weight_t, typename output_t>
 void selective_scan_fwd_launch(SSMParamsBase &params, cudaStream_t stream) {
-    BOOL_SWITCH(params.seqlen % (kNThreads * kNItems) == 0, kIsEvenLen, [&] {
-        using Ktraits = Selective_Scan_fwd_kernel_traits<kNThreads, kNItems, kIsEvenLen, input_t, weight_t, output_t>;
+    const bool is_even_len = params.seqlen % (kNThreads * kNItems) == 0;
+
+    if (is_even_len) {
+        using Ktraits = Selective_Scan_fwd_kernel_traits<kNThreads, kNItems, true, input_t, weight_t, output_t>;
         constexpr int kSmemSize = Ktraits::kSmemSize + Ktraits::MaxDState * sizeof(typename Ktraits::scan_t);
-        // printf("smem_size = %d\n", kSmemSize);
         dim3 grid(params.batch, params.dim);
         auto kernel = &selective_scan_fwd_kernel<Ktraits>;
         if (kSmemSize >= 48 * 1024) {
@@ -192,7 +193,17 @@ void selective_scan_fwd_launch(SSMParamsBase &params, cudaStream_t stream) {
         }
         kernel<<<grid, Ktraits::kNThreads, kSmemSize, stream>>>(params);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
-    });
+    } else {
+        using Ktraits = Selective_Scan_fwd_kernel_traits<kNThreads, kNItems, false, input_t, weight_t, output_t>;
+        constexpr int kSmemSize = Ktraits::kSmemSize + Ktraits::MaxDState * sizeof(typename Ktraits::scan_t);
+        dim3 grid(params.batch, params.dim);
+        auto kernel = &selective_scan_fwd_kernel<Ktraits>;
+        if (kSmemSize >= 48 * 1024) {
+            C10_CUDA_CHECK(cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, kSmemSize));
+        }
+        kernel<<<grid, Ktraits::kNThreads, kSmemSize, stream>>>(params);
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
 }
 
 template<int knrows, typename input_t, typename weight_t, typename output_t>
