@@ -27,6 +27,9 @@ def parse_opt():
     parser.add_argument('--name', default='mambayolo_rtdetr', help='save to project/name')
     parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference')
     parser.add_argument('--dnn', action='store_true', help='use OpenCV DNN for ONNX inference')
+    parser.add_argument('--label_smoothing', type=float, default=0.05, help='warmup bias learning rate')
+    parser.add_argument('--erasing', type=float, default=0.15, help='warmup bias learning rate')
+    parser.add_argument('--weight_decay', type=float, default=0.0001, help='warmup bias learning rate')
     opt = parser.parse_args()
     return opt
 
@@ -49,6 +52,9 @@ if __name__ == '__main__':
         "amp": opt.amp,
         "project": ROOT + opt.project,
         "name": opt.name,
+        "label_smoothing": opt.label_smoothing,
+        "erasing": opt.erasing,
+        "weight_decay": opt.weight_decay
     }
     model_conf = ROOT + opt.config
     model = MambaYOLORTDETR(model_conf)
